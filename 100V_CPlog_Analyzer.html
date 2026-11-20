@@ -28,6 +28,7 @@ canvas{display:block;max-width:100%}
 svg{max-width:100%;height:auto;display:block}
 svg text{fill:var(--mut);font-size:11px}
 .bar{fill:var(--ac)}.bad{fill:var(--bad)}
+.png{font-size:12px;padding:2px 8px;float:right;margin-left:8px}
 table{border-collapse:collapse;width:100%;font-size:12px}
 th,td{border-bottom:1px solid var(--bd);padding:3px 8px;text-align:right;white-space:nowrap}
 th:first-child,td:first-child{text-align:left}
@@ -39,7 +40,7 @@ th:first-child,td:first-child{text-align:left}
 <div style="padding:0 12px 12px"><div id="chips" class="chips"></div><div id="info" class="mut" style="margin-top:6px"></div></div></div>
 <div id="app" hidden>
 <div class="tabs"><button data-t="heat">Heatmap</button><button data-t="hist">上下限 / 分布</button><button data-t="par">柏拉圖</button><button data-t="yld">良率趨勢</button>
-<select id="item"></select><select id="hm"><option value="c">次數</option><option value="d">機率密度</option></select><select id="gp"><option value="w">各片 (Wafer)</option><option value="l">各批 (Lot)</option><option value="c">各站別 (Load Board)</option></select></div>
+<button id="all" title="逐張下載目前頁面所有圖表">⬇ 全部 PNG</button><select id="item"></select><select id="hm"><option value="c">次數</option><option value="d">機率密度</option></select><select id="gp"><option value="w">各片 (Wafer)</option><option value="l">各批 (Lot)</option><option value="c">各站別 (Load Board)</option></select></div>
 <div id="out"></div></div>
 </main>
 <script>
@@ -97,7 +98,7 @@ function heat(o){
    m[r.x+','+r.y]=r});
   cv.onmousemove=e=>{const R=cv.getBoundingClientRect(),k=cv.width/R.width,x=Math.floor((e.clientX-R.left)*k/c)+X[0],y=Math.floor((e.clientY-R.top)*k/c)+Y[0],r=m[x+','+y];
    cv.title=r?`X=${x} Y=${y} Bin=${r.bin}\n`+(bin?'':w.names[j]+' = '+(isFinite(r.v[j])?r.v[j]:'未測')):''};
-  const d=document.createElement('div');d.className='card';d.innerHTML=`<b>${esc(w.id)}</b> <span class="mut">良率 ${(100*p/w.rows.length).toFixed(2)}% (${p}/${w.rows.length})</span>`;d.appendChild(cv);o.querySelector('.grid').appendChild(d)});
+  const d=document.createElement('div');d.className='card';d.innerHTML=`<button class="png" data-n="heatmap_${esc(bin?'Bin':W[0].names[j])}_${esc(w.id)}" data-t="${esc(w.id)} | ${esc(bin?'Bin Map':W[0].names[j])}" data-s="${bin?'Bin Map (綠=Bin1)':'色階 '+fmt(a)+' ~ '+fmt(b)+'（黑框=超規，灰=未測）'}">⬇ PNG</button><b>${esc(w.id)}</b> <span class="mut">良率 ${(100*p/w.rows.length).toFixed(2)}% (${p}/${w.rows.length})</span>`;d.appendChild(cv);o.querySelector('.grid').appendChild(d)});
 }
 function stats(d){const n=d.length,m=d.reduce((s,v)=>s+v,0)/n,sd=Math.sqrt(d.reduce((s,v)=>s+(v-m)**2,0)/Math.max(1,n-1));return{n,m,sd,mn:Math.min(...d),mx:Math.max(...d)}}
 function hist(o){
@@ -121,7 +122,7 @@ function hist(o){
   cpk=Math.min(U!==null?(U-st.m)/(3*st.sd):1e9,Lw!==null?(st.m-Lw)/(3*st.sd):1e9),hid=d.length-dv.length;
  const rows=ws.map(w=>{const x=w.rows.map(r=>r.v[j]).filter(v=>isFinite(v)),z=x.filter(v=>v>=a&&v<=b),u=z.length?stats(z):null,f=x.filter(v=>(U!==null&&v>U)||(Lw!==null&&v<Lw)).length;
   return`<tr><td>${esc(w.id)}</td><td>${x.length}</td><td>${u?fmt(u.m):'-'}</td><td>${u?fmt(u.sd):'-'}</td><td>${f}</td></tr>`}).join('');
- o.innerHTML=`<div class="card sc">${s}</div><div class="card sc"><table><tr><th>統計（顯示範圍內）</th><th>n</th><th>μ</th><th>σ</th><th>Min</th><th>Max</th><th>LSL</th><th>USL</th><th>Cp</th><th>Cpk</th><th>超規數</th></tr>
+ o.innerHTML=`<div class="card sc"><button class="png" data-n="hist_${esc(W[0].names[j])}" data-t="${esc(W[0].names[j])} 分布" data-s="已選 ${ws.length} 片，n=${st.n}">⬇ PNG</button>${s}</div><div class="card sc"><table><tr><th>統計（顯示範圍內）</th><th>n</th><th>μ</th><th>σ</th><th>Min</th><th>Max</th><th>LSL</th><th>USL</th><th>Cp</th><th>Cpk</th><th>超規數</th></tr>
  <tr><td>已選 ${ws.length} 片合計</td><td>${st.n}</td><td>${fmt(st.m)}</td><td>${fmt(st.sd)}</td><td>${fmt(st.mn)}</td><td>${fmt(st.mx)}</td><td>${Lw??'無'}</td><td>${U??'無'}</td><td>${cp===null?'-':cp.toFixed(2)}</td><td>${cpk>1e8?'-':cpk.toFixed(2)}</td><td>${fails}</td></tr></table>
  <div class="mut" style="margin-top:6px">±99.999 視為「未設限」；${hid?`有 ${hid} 筆極端值（如 overflow=100）超出圖面範圍，未畫入但已計入超規數。`:''}紅柱 = 落在規格外。</div></div>
  <div class="card sc"><table><tr><th>Wafer</th><th>n</th><th>μ</th><th>σ</th><th>超規數</th></tr>${rows}</table></div>`;
@@ -140,7 +141,7 @@ function par(o){
   s+=`<rect class="${k===0?'bad':'bar'}" x="${cx-bwid*.36}" y="${sy(x.v)}" width="${bwid*.72}" height="${sy(0)-sy(x.v)}"/><text x="${cx}" y="${sy(x.v)-4}" text-anchor="middle">${x.v}</text>
   <text transform="translate(${cx},${H-bt+12}) rotate(-40)" text-anchor="end">${esc(W[0].names[x.j])}</text>`;pth+=(k?'L':'M')+cx+','+sp(x.c);});
  s+=`<path d="${pth}" fill="none" stroke="var(--ln)" stroke-width="2"/>`+it.map((x,k)=>`<circle cx="${l+bwid*(k+.5)}" cy="${sp(x.c)}" r="3" fill="var(--ln)"/>`).join('')+'</svg>';
- o.innerHTML=`<div class="card sc"><b>所有測項 Fail 柏拉圖</b> <span class="mut">已選 ${ws.length} 片，共 ${tot} 顆 die，超規 ${F} 次（${(F/tot*100).toFixed(2)}%）；虛線 = 80%</span>${s}</div>
+ o.innerHTML=`<div class="card sc"><button class="png" data-n="pareto_fail" data-t="所有測項 Fail 柏拉圖" data-s="已選 ${ws.length} 片，${tot} 顆 die，超規 ${F} 次">⬇ PNG</button><b>所有測項 Fail 柏拉圖</b> <span class="mut">已選 ${ws.length} 片，共 ${tot} 顆 die，超規 ${F} 次（${(F/tot*100).toFixed(2)}%）；虛線 = 80%</span>${s}</div>
  <div class="card sc"><table><tr><th>測項</th><th>Fail 數</th><th>占 Fail %</th><th>累積 %</th><th>損失率（/總 die）</th><th>下限</th><th>上限</th></tr>${it.map(x=>`<tr><td>${esc(W[0].names[x.j])}</td><td>${x.v}</td><td>${(x.v/F*100).toFixed(1)}</td><td>${x.c.toFixed(1)}</td><td>${(x.v/tot*100).toFixed(2)}%</td><td>${W[0].lo[x.j]}</td><td>${W[0].up[x.j]}</td></tr>`).join('')}</table>
  <div class="mut" style="margin-top:6px">fail 的 die 會在失敗測項即停止量測，因此每顆 die 只會被記一次（第一個失敗項）。零 fail 的測項未列出。</div></div>`;
 }
@@ -156,8 +157,26 @@ function yld(o){
  s+=`<path d="${A.map((e,k)=>(k?'L':'M')+cx(k)+','+sy(e.y)).join('')}" fill="none" stroke="var(--ac)" stroke-width="2"/>`+A.map((e,k)=>`<circle cx="${cx(k)}" cy="${sy(e.y)}" r="4" fill="var(--ac)"><title>${esc(e.k)}: ${e.y.toFixed(2)}% (${e.p}/${e.n})</title></circle><text x="${cx(k)}" y="${sy(e.y)-9}" text-anchor="middle" style="fill:var(--fg)">${e.y.toFixed(2)}</text>`).join('');
  s+=`<text x="${l}" y="284">${lb}</text><line x1="${l}" x2="${Wd-r}" y1="440" y2="440" stroke="var(--bd)"/>`;
  s+=A.map((e,k)=>`<rect class="bar" x="${cx(k)-bw*.3}" y="${sb(e.v)}" width="${bw*.6}" height="${440-sb(e.v)}"/><text x="${cx(k)}" y="${sb(e.v)-4}" text-anchor="middle" style="fill:var(--fg)">${e.v}</text><text transform="translate(${cx(k)},454) rotate(-40)" text-anchor="end">${esc(e.k)}</text>`).join('')+'</svg>';
- o.innerHTML=`<div class="card sc">${s}</div><div class="card sc"><table><tr><th>${g==='w'?'Wafer':g==='l'?'Lot':'站別'}</th><th>Wafer 數 (pcs)</th><th>測試 die</th><th>Pass</th><th>良率 %</th></tr>${A.map(e=>`<tr><td>${esc(e.k)}</td><td>${e.wf}</td><td>${e.n}</td><td>${e.p}</td><td>${e.y.toFixed(2)}</td></tr>`).join('')}</table></div>`;
+ o.innerHTML=`<div class="card sc"><button class="png" data-n="yield_${g}" data-t="良率趨勢　${$('#gp').selectedOptions[0].text}" data-s="上：良率 %　下：${lb}">⬇ PNG</button>${s}</div><div class="card sc"><table><tr><th>${g==='w'?'Wafer':g==='l'?'Lot':'站別'}</th><th>Wafer 數 (pcs)</th><th>測試 die</th><th>Pass</th><th>良率 %</th></tr>${A.map(e=>`<tr><td>${esc(e.k)}</td><td>${e.wf}</td><td>${e.n}</td><td>${e.p}</td><td>${e.y.toFixed(2)}</td></tr>`).join('')}</table></div>`;
 }
+async function exp(btn){
+ const el=btn.closest('.card').querySelector('svg,canvas'),cs=getComputedStyle(document.documentElement),bg=cs.getPropertyValue('--card').trim()||'#fff',fg=cs.getPropertyValue('--fg').trim()||'#000',mu=cs.getPropertyValue('--mut').trim()||'#666',P=16,T=btn.dataset.t,Sb=btn.dataset.s,hh=(T?26:0)+(Sb?20:0),isS=el instanceof SVGElement;
+ let img,w,h,sc=isS?2:3;
+ if(isS){const vb=el.viewBox.baseVal;w=vb.width;h=vb.height;
+  const cl=el.cloneNode(true),oa=[el,...el.querySelectorAll('*')],ca=[cl,...cl.querySelectorAll('*')];
+  oa.forEach((o,i)=>{const c=getComputedStyle(o);['fill','stroke','stroke-width','stroke-dasharray','font-size','font-family','text-anchor'].forEach(p=>ca[i].style.setProperty(p,c.getPropertyValue(p)))});
+  cl.removeAttribute('style');cl.setAttribute('xmlns','http://www.w3.org/2000/svg');cl.setAttribute('width',w);cl.setAttribute('height',h);
+  img=new Image();await new Promise((ok,er)=>{img.onload=ok;img.onerror=er;img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(new XMLSerializer().serializeToString(cl))})}
+ else{img=el;w=el.width;h=el.height}
+ const ow=Math.max(w,isS?0:420),o=document.createElement('canvas');o.width=(ow+2*P)*sc;o.height=(h+2*P+hh)*sc;
+ const g=o.getContext('2d');g.scale(sc,sc);g.fillStyle=bg;g.fillRect(0,0,o.width,o.height);
+ g.fillStyle=fg;g.font='bold 16px system-ui,"Noto Sans TC","Microsoft JhengHei",sans-serif';if(T)g.fillText(T,P,P+16);
+ g.fillStyle=mu;g.font='12px system-ui,"Noto Sans TC","Microsoft JhengHei",sans-serif';if(Sb)g.fillText(Sb,P,P+(T?38:14));
+ g.imageSmoothingEnabled=isS;g.drawImage(img,P,P+hh,w,h);
+ await new Promise(ok=>o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(btn.dataset.n||'chart').replace(/[\\/:*?"<>|\s]+/g,'_')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);ok()}));
+}
+$('#out').addEventListener('click',e=>{const b=e.target.closest('.png');if(b)exp(b).catch(()=>alert('PNG 匯出失敗'))});
+$('#all').onclick=async()=>{for(const b of document.querySelectorAll('#out .png')){await exp(b);await new Promise(r=>setTimeout(r,350))}};
 $('#fi').onchange=e=>load(e.target.files);
 const dz=$('#drop');['dragover','dragenter'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('on')}));
 ['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('on')}));

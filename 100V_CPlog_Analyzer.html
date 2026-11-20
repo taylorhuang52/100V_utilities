@@ -40,7 +40,7 @@ th:first-child,td:first-child{text-align:left}
 <div style="padding:0 12px 12px"><div id="chips" class="chips"></div><div id="info" class="mut" style="margin-top:6px"></div></div></div>
 <div id="app" hidden>
 <div class="tabs"><button data-t="heat">Heatmap</button><button data-t="hist">上下限 / 分布</button><button data-t="par">柏拉圖</button><button data-t="yld">良率趨勢</button>
-<button id="all" title="逐張下載目前頁面所有圖表">⬇ 全部 PNG</button><select id="item"></select><select id="hm"><option value="c">次數</option><option value="d">機率密度</option></select><select id="gp"><option value="w">各片 (Wafer)</option><option value="l">各批 (Lot)</option><option value="c">各站別 (Load Board)</option></select></div>
+<button id="all" title="把目前頁面所有圖拼成一張 PNG（Heatmap 為陣列排列）">⬇ 全部 PNG</button><select id="item"></select><select id="hm"><option value="c">次數</option><option value="d">機率密度</option></select><select id="gp"><option value="w">各片 (Wafer)</option><option value="l">各批 (Lot)</option><option value="c">各站別 (Load Board)</option></select></div>
 <div id="out"></div></div>
 </main>
 <script>
@@ -159,7 +159,7 @@ function yld(o){
  s+=A.map((e,k)=>`<rect class="bar" x="${cx(k)-bw*.3}" y="${sb(e.v)}" width="${bw*.6}" height="${440-sb(e.v)}"/><text x="${cx(k)}" y="${sb(e.v)-4}" text-anchor="middle" style="fill:var(--fg)">${e.v}</text><text transform="translate(${cx(k)},454) rotate(-40)" text-anchor="end">${esc(e.k)}</text>`).join('')+'</svg>';
  o.innerHTML=`<div class="card sc"><button class="png" data-n="yield_${g}" data-t="良率趨勢　${$('#gp').selectedOptions[0].text}" data-s="上：良率 %　下：${lb}">⬇ PNG</button>${s}</div><div class="card sc"><table><tr><th>${g==='w'?'Wafer':g==='l'?'Lot':'站別'}</th><th>Wafer 數 (pcs)</th><th>測試 die</th><th>Pass</th><th>良率 %</th></tr>${A.map(e=>`<tr><td>${esc(e.k)}</td><td>${e.wf}</td><td>${e.n}</td><td>${e.p}</td><td>${e.y.toFixed(2)}</td></tr>`).join('')}</table></div>`;
 }
-async function exp(btn){
+async function exp(btn,ret){
  const el=btn.closest('.card').querySelector('svg,canvas'),cs=getComputedStyle(document.documentElement),bg=cs.getPropertyValue('--card').trim()||'#fff',fg=cs.getPropertyValue('--fg').trim()||'#000',mu=cs.getPropertyValue('--mut').trim()||'#666',P=16,T=btn.dataset.t,Sb=btn.dataset.s,hh=(T?26:0)+(Sb?20:0),isS=el instanceof SVGElement;
  let img,w,h,sc=isS?2:3;
  if(isS){const vb=el.viewBox.baseVal;w=vb.width;h=vb.height;
@@ -173,10 +173,20 @@ async function exp(btn){
  g.fillStyle=fg;g.font='bold 16px system-ui,"Noto Sans TC","Microsoft JhengHei",sans-serif';if(T)g.fillText(T,P,P+16);
  g.fillStyle=mu;g.font='12px system-ui,"Noto Sans TC","Microsoft JhengHei",sans-serif';if(Sb)g.fillText(Sb,P,P+(T?38:14));
  g.imageSmoothingEnabled=isS;g.drawImage(img,P,P+hh,w,h);
+ if(ret)return o;
  await new Promise(ok=>o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(btn.dataset.n||'chart').replace(/[\\/:*?"<>|\s]+/g,'_')+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000);ok()}));
 }
 $('#out').addEventListener('click',e=>{const b=e.target.closest('.png');if(b)exp(b).catch(()=>alert('PNG 匯出失敗'))});
-$('#all').onclick=async()=>{for(const b of document.querySelectorAll('#out .png')){await exp(b);await new Promise(r=>setTimeout(r,350))}};
+$('#all').onclick=async()=>{
+ const bs=[...document.querySelectorAll('#out .png')];if(!bs.length)return;
+ const cs=[];for(const b of bs)cs.push(await exp(b,true));
+ const cols=S.t==='heat'?Math.min(cs.length,4):1,gap=24,cw=Math.max(...cs.map(c=>c.width)),ch=Math.max(...cs.map(c=>c.height)),rows=Math.ceil(cs.length/cols),
+  o=document.createElement('canvas'),bg=getComputedStyle(document.documentElement).getPropertyValue('--card').trim()||'#fff';
+ o.width=cols*cw+(cols+1)*gap;o.height=rows*ch+(rows+1)*gap;
+ const g=o.getContext('2d');g.fillStyle=bg;g.fillRect(0,0,o.width,o.height);
+ cs.forEach((c,i)=>g.drawImage(c,gap+(i%cols)*(cw+gap),gap+Math.floor(i/cols)*(ch+gap)));
+ o.toBlob(b=>{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(S.t+'_'+(S.t==='par'||S.t==='yld'?'':$('#item').selectedOptions[0].text+'_')+'all.png').replace(/[\\/:*?"<>|\s]+/g,'_');a.click();setTimeout(()=>URL.revokeObjectURL(a.href),3000)});
+};
 $('#fi').onchange=e=>load(e.target.files);
 const dz=$('#drop');['dragover','dragenter'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('on')}));
 ['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('on')}));
